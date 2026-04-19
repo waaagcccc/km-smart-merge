@@ -102,7 +102,7 @@
 
 <div id="welcome-modal">
     <div class="welcome-card">
-        <h1>🚀 欢迎使用 KM Merger Pro V1.0</h1>
+        <h1>🚀 欢迎使用 KM Merger Pro</h1>
         <p>为保证最佳合并体验，请问您本次任务<br><strong style="color:white;">需要合并几条生存曲线？</strong></p>
         <div class="welcome-btn-group">
             <button class="btn-p" onclick="startGame(2)">✌️ 2 条</button>
@@ -228,7 +228,6 @@
     </div>
     
     <div class="footer-note">
-        KM Merger Pro V1.0<br>
         <span style="font-size:0.6rem; color:#64748b;">使用相关问题可以企微联系生物计量部王策</span>
     </div>
 </div>
@@ -365,6 +364,7 @@
         renderTaskList();
         hardClearCanvas(); 
         updateLockState();
+        alert("✅ 已追加名额");
     }
 
     function deleteCurve(index) {
@@ -452,6 +452,9 @@
         
         if (remain === 0) {
             updateLockState();
+            setTimeout(() => {
+                alert("🎉 所有曲线已打卡完毕！\n\n系统已锁定提取面板，防止数据溢出。\n请在侧边栏确认合并参数后，点击【一键拼合】生成报表。");
+            }, 50);
         } else {
             updateLockState();
             setTimeout(() => {
