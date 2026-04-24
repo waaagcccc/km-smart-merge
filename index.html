@@ -42,14 +42,15 @@
         canvas { display: block; }
         
         #paste-hint { position: absolute; color: #94a3b8; font-size: 0.95rem; pointer-events: none; text-align: center; line-height: 1.6; }
-        #eraser-cursor { position: fixed; border: 2px solid white; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; mix-blend-mode: difference; }
+        
+        #eraser-cursor { position: fixed; border: 2px solid white; border-radius: 50%; pointer-events: none; display: none; z-index: 9999; box-shadow: 0 0 4px rgba(0,0,0,0.4); box-sizing: border-box; transform: translate(-50%, -50%); }
 
-        #zoom-container { position: fixed; top: 20px; right: 20px; z-index: 100; display: none; flex-direction: column; align-items: center; pointer-events: none; }
+        #zoom-container { position: absolute; top: 20px; right: 20px; z-index: 100; display: none; flex-direction: column; align-items: center; pointer-events: none; }
         #zoom-canvas { border: 3px solid var(--primary); border-radius: 12px; box-shadow: 0 0 20px rgba(0,0,0,0.5); background: white; }
         #coordinate-overlay { margin-top: 8px; background: rgba(15, 23, 42, 0.95); padding: 8px 15px; border-radius: 8px; border: 1px solid var(--primary); color: white; font-family: monospace; font-size: 13px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
 
         .card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px solid #334155; margin-bottom: 5px; transition: 0.4s ease; }
-        .step-locked { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
+        .step-locked { opacity: 0.3; pointer-events: none; filter: grayscale(1); transition: 0.3s; }
 
         h2 { font-size: 0.85rem; margin: 0 0 10px 0; color: #a78bfa; text-transform: uppercase; border-bottom: 1px solid #334155; padding-bottom: 5px; }
         
@@ -77,7 +78,7 @@
         .info-tip { display: inline-block; width: 14px; height: 14px; background: #475569; color: #fff; border-radius: 50%; text-align: center; line-height: 14px; font-size: 10px; cursor: help; margin-left: 5px; position: relative; }
         .info-tip:hover::after { content: attr(data-tip); position: absolute; left: 20px; top: 0; width: 220px; background: #1e293b; color: #f1f5f9; padding: 8px; border-radius: 4px; border: 1px solid #8b5cf6; z-index: 100; text-align: left; line-height: 1.4; font-weight: normal; font-size: 0.7rem;}
 
-        #color-monitor { font-size: 0.75rem; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 15px; margin-top: 5px; border: 1px solid #334155; }
+        #color-monitor { font-size: 0.75rem; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 6px; display: flex; align-items: center; gap: 15px; margin-top: 10px; border: 1px solid #334155; }
         #active-color-swatch { width: 30px; height: 30px; border-radius: 6px; border: 2px solid #fff; }
 
         #preview-box { display: none; background: #0f172a; border: 1px solid var(--primary); border-radius: 10px; padding: 15px; margin-top: 5px; margin-bottom: 5px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
@@ -91,7 +92,7 @@
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(245, 158, 11, 0); } 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } }
 
         #result-modal { display: none; position: absolute; inset: 20px; background: var(--card); z-index: 100; border-radius: 12px; padding: 20px; box-shadow: 0 0 40px rgba(0,0,0,0.9); flex-direction: column; border: 1px solid var(--primary); }
-        .chart-container-large { flex: 1; background: #ffffff; border-radius: 8px; padding: 15px; margin-top: 15px; border: 1px solid #cbd5e1; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); }
+        .chart-container-large { flex: 1; background: #ffffff; border-radius: 8px; padding: 15px; margin-top: 15px; border: 1px solid #cbd5e1; box-shadow: inset 0 0 10px rgba(0,0,0,0.05); cursor: crosshair; }
         
         .footer-note { margin-top: auto; text-align: center; font-size: 0.7rem; color: #475569; padding-top: 15px; letter-spacing: 0.5px; }
     </style>
@@ -110,33 +111,66 @@
     </div>
 </div>
 
+<div id="custom-confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; backdrop-filter: blur(5px);">
+    <div style="background: #1e293b; border: 2px solid #8b5cf6; padding: 30px; border-radius: 12px; text-align: center; box-shadow: 0 0 40px rgba(139, 92, 246, 0.3); max-width: 450px;">
+        <h2 style="color: #22c55e; font-size: 1.2rem; border: none; margin-top: 0; margin-bottom: 15px;">✅ 提取成功！</h2>
+        <p style="color: #f1f5f9; font-size: 1rem; margin-bottom: 15px; line-height: 1.6; text-align: left;">
+            还剩 <span id="custom-confirm-remain" style="color: #f59e0b; font-weight: bold;"></span> 条待提取。<br><br>
+            🤔 <span style="color: #ef4444; font-weight: bold;">请问下一条曲线还在【当前图片】上吗？</span><br><br>
+            <span style="font-size: 0.9rem; color: #94a3b8;">▶ 选项【是】：留在当前图片继续提取<br>
+            ▶ 选项【否】：导入新图</span>
+        </p>
+        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 20px;">
+            <button id="btn-confirm-yes" class="btn-p" style="color: white; padding: 10px 20px; flex: 1; font-size: 1.1rem;">是</button>
+            <button id="btn-confirm-no" class="btn-g" style="color: white; padding: 10px 20px; flex: 1; font-size: 1.1rem;">否</button>
+        </div>
+    </div>
+</div>
+
 <div class="sidebar">
     <div style="font-weight: 900; font-size: 1.1rem; color: var(--primary); text-align: center; margin-bottom:10px; text-transform: uppercase; letter-spacing: 1px;">KM MERGER PRO V1.0</div>
     <button class="reset-all-btn" onclick="masterReset()">🔄 一键全网页初始化</button>
 
-    <div class="card" id="step1-card">
-        <h2>1. 图片导入与标定</h2>
-        <input type="file" id="upload" accept="image/*" onclick="this.value=null">
-        <div style="font-size:0.75rem; color:#94a3b8; margin-top:10px;">
-            X轴最大数值与单位 <span class="info-tip" data-tip="例如最大值设定为24，取点范围即为0-24。">i</span>:
+    <div class="card" id="task-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 5px; margin-bottom: 5px;">
+            <h2 style="margin:0; border:none; color:var(--success);">📊 提取进度清单</h2>
+            <button class="btn-g" style="width:auto; padding: 4px 10px; font-size:0.7rem; margin:0;" onclick="addExtraCurve()" title="临时增加一条曲线名额">➕ 追加曲线</button>
         </div>
-        
-        <div style="display: flex; gap: 5px; margin-top: 5px;">
-            <input type="number" id="maxXValue" placeholder="必填" autocomplete="off" style="flex: 1; margin-top: 0;" onchange="checkAndAutoStartCalibration()" onkeyup="if(event.key === 'Enter') checkAndAutoStartCalibration()">
-            <select id="xUnit" style="flex: 1; margin-top: 0; cursor: pointer;">
-                <option value="M">月 (Months)</option>
-                <option value="Y">年 (Years)</option>
-                <option value="W">周 (Weeks)</option>
-                <option value="D">天 (Days)</option>
-            </select>
-        </div>
-        
-        <button class="btn-g" style="margin-top:8px; font-size:0.75rem;" onclick="startCalibration()">📍 重新标定坐标系</button>
+        <div id="task-list"></div>
     </div>
 
-    <div class="card step-locked" id="extract-card">
+    <div class="card" id="step1-card">
+        <h2>1. 图片导入与标定</h2>
+        
+        <div style="display:flex; align-items:center; gap: 10px;">
+            <input type="file" id="upload" accept="image/*" onclick="this.value=null" style="flex:1; padding: 6px;">
+            <span id="upload-status" style="color:#94a3b8; font-size:0.75rem; white-space:nowrap;">等待导入...</span>
+        </div>
+        
+        <div style="display:flex; align-items:center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #334155;">
+            <div style="font-size:0.75rem; color:#94a3b8; flex:1;">坐标系标定状态:</div>
+            <span id="calib-status" style="color:#94a3b8; font-size:0.75rem; white-space:nowrap;">未开始</span>
+        </div>
+
+        <div style="font-size:0.75rem; color:#94a3b8; margin-top:15px;" id="maxX-container" class="step-locked">
+            分析时间的最大值 <span class="info-tip" data-tip="例如最大值设定为24，取点范围即为0-24。">i</span>:
+            <div style="display: flex; gap: 5px; margin-top: 5px;">
+                <input type="number" id="maxXValue" placeholder="必填" autocomplete="off" style="flex: 1; margin-top: 0;" onchange="handleMaxXChange()" onkeyup="if(event.key === 'Enter') handleMaxXChange()">
+                <select id="xUnit" style="flex: 1; margin-top: 0; cursor: pointer;">
+                    <option value="M">月 (Months)</option>
+                    <option value="Y">年 (Years)</option>
+                    <option value="W">周 (Weeks)</option>
+                    <option value="D">天 (Days)</option>
+                </select>
+            </div>
+        </div>
+        
+        <button class="btn-g" style="margin-top:8px; font-size:0.75rem;" onclick="startCalibration(false)">📍 如果坐标系标定错误，点击重新标定</button>
+    </div>
+
+    <div class="card step-locked" id="extract-card" style="display: none;">
         <h2>2. 提取曲线数据</h2>
-        <button class="btn-g" onclick="setMode('picker')">🖊️ 步骤1：吸取目标颜色 (可反复点)</button>
+        <button class="btn-p" onclick="setMode('picker')">🖊️ 步骤1：吸取目标颜色 (可反复点)</button>
         
         <div id="color-monitor">
             <div id="active-color-swatch" style="background: transparent;"></div>
@@ -147,23 +181,24 @@
             <span>容差 <span class="info-tip" data-tip="控制抓取颜色的严格程度。彩色线建议10-20，灰/黑线建议30-50。">i</span></span>
             <span id="tol-val" style="color:var(--primary); font-weight:bold; font-family:monospace; font-size:0.9rem;">35</span>
         </div>
-        <input type="range" id="tolerance" min="10" max="80" value="35" oninput="document.getElementById('tol-val').innerText = this.value">
+        <input type="range" id="tolerance" min="5" max="100" value="35" oninput="document.getElementById('tol-val').innerText = this.value">
 
-        <div class="label-group">
+        <div class="label-group" style="margin-top:5px;">
             <span>断点跨度 <span class="info-tip" data-tip="【虚线/断裂线】可拉高至 15~30，程序会自动跳过空白区寻点。">i</span></span>
             <span id="jump-val" style="color:var(--warning); font-weight:bold; font-family:monospace; font-size:0.9rem;">3</span>
         </div>
         <input type="range" id="jumpSpan" min="1" max="40" value="3" oninput="document.getElementById('jump-val').innerText = this.value">
 
-        <button class="btn-p" style="margin-top:10px;" onclick="setMode('smart')">🪄 步骤2：锁定颜色后再次点击目标曲线</button>
+        <button class="btn-p" style="margin-top:10px; font-size:0.9rem; padding:12px;" onclick="setMode('smart')">🪄 步骤2：锁定颜色后再次点击目标曲线</button>
         <button class="btn-g" style="background:#334155; font-size:0.75rem; margin-top:5px;" onclick="clearCurrentLine()">🧹 清除当前提取线条</button>
     </div>
 
-    <div class="card step-locked" id="repair-card">
+    <div class="card step-locked" id="repair-card" style="display: none;">
         <h2>🔧 辅助修补工具</h2>
         <div style="display:flex; gap:5px;">
-            <button class="btn-o" style="font-size:0.75rem; flex:1;" onclick="setMode('manual_add')">➕ 补大黄点</button>
-            <button class="btn-d" style="font-size:0.75rem; flex:1;" onclick="setMode('eraser')">🧼 圆形橡皮</button>
+            <button class="btn-o" style="font-size:0.75rem; flex:1;" onclick="setMode('manual_add')">➕ 补断点</button>
+            <button class="btn-d" style="font-size:0.75rem; flex:1;" onclick="setMode('eraser')">🧼 橡皮擦</button>
+            <button class="btn-p" style="font-size:0.75rem; flex:1; background:#0ea5e9;" onclick="setMode('censor')">✛ 标删失点</button>
         </div>
         <div class="label-group">
             <span>工具半径</span>
@@ -180,13 +215,8 @@
         <button class="btn-s" style="margin-top:10px;" onclick="saveCurrentCurve()">✅ 确认无误，打卡存入清单</button>
     </div>
 
-    <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #334155; padding-bottom: 5px; margin-bottom: 10px;">
-            <h2 style="margin:0; border:none;">3. 合并曲线</h2>
-            <button class="btn-g" style="width:auto; padding: 4px 10px; font-size:0.7rem; margin:0;" onclick="addExtraCurve()" title="临时增加一条曲线名额">➕ 额外曲线</button>
-        </div>
-        
-        <div id="task-list"></div>
+    <div class="card" id="merge-card" style="display: none;">
+        <h2 style="margin:0 0 10px 0; border-bottom: 1px solid #334155; padding-bottom: 5px; color:#a78bfa;">3. 设定参数与导出</h2>
 
         <div style="display: flex; gap: 6px; margin-top: 15px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 100px;">
@@ -210,12 +240,6 @@
         
         <div style="display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;">
             <div style="flex: 1; min-width: 120px;">
-                <div style="font-size:0.65rem; color:#94a3b8; letter-spacing:-0.5px;">
-                    生存率导出的间隔 <span class="info-tip" data-tip="例如填写1，生存率将按照时间间隔为1进行导出。">i</span>
-                </div>
-                <input type="number" id="mergeStep" value="1" step="0.1" autocomplete="off" style="padding: 6px; color:var(--warning); font-weight:bold;">
-            </div>
-            <div style="flex: 1; min-width: 120px;">
                 <div style="font-size:0.7rem; color:#94a3b8;">Y轴名称:</div>
                 <input type="text" id="yAxisLabel" value="Survival Rate" autocomplete="off" style="padding: 6px; color:#f1f5f9;">
             </div>
@@ -232,10 +256,10 @@
 <div class="main-content">
     
     <div class="corner-logo-container">
-        <img src="logo.jpg" alt="KM Merger Pro Logo">
+        <img src="logo.jpg" alt="KM Merger Pro Logo" onerror="this.style.display='none'">
     </div>
 
-    <div id="nav-guide">💡 请先在欢迎窗口设定任务目标</div>
+    <div id="nav-guide">💡 进度 (0/0): 请导入第 1 张图片开始任务。</div>
     <div id="canvas-wrapper">
         <div id="paste-hint">🖼️ 点击此处选择图片<br>或按 Ctrl+V 粘贴截图开始任务</div>
         <canvas id="mainCanvas"></canvas>
@@ -246,7 +270,6 @@
             <h2 style="margin:0; border:none; color:white; font-size:1.2rem;">📊 KM 曲线合并分析面板</h2>
             <div style="display: flex; gap: 10px;">
                 <button class="btn-p" style="width:auto; padding: 8px 20px; background:#3b82f6;" onclick="exportMergedImage()">📸 导出高清白底图 (PNG)</button>
-                <button class="btn-s" style="width:auto; padding: 8px 20px; background:#059669;" onclick="exportMergedCSV()">💾 导出对齐原始数据 (CSV)</button>
                 <button class="btn-g" style="width:auto; padding: 8px 20px;" onclick="document.getElementById('result-modal').style.display='none'">❌ 关闭面板</button>
             </div>
         </div>
@@ -269,6 +292,113 @@
     Chart.defaults.scale.grid.color = '#334155';
     Chart.defaults.scale.grid.borderColor = '#475569';
 
+    Chart.Interaction.modes.kmCrosshair = function(chart, e, options, useFinalPosition) {
+        const items = [];
+        const mouseX = e.x;
+        const mouseY = e.y;
+        
+        chart.data.datasets.forEach((dataset, datasetIndex) => {
+            if (dataset.type === 'scatter') return; 
+            const meta = chart.getDatasetMeta(datasetIndex);
+            if (meta.hidden || meta.data.length === 0) return;
+            
+            let bestIdx = 0;
+            let minDist = Infinity;
+            for (let i = 0; i < meta.data.length; i++) {
+                let dist = Math.abs(meta.data[i].x - mouseX);
+                if (dist < minDist) {
+                    minDist = dist;
+                    bestIdx = i;
+                }
+            }
+            items.push({
+                datasetIndex: datasetIndex,
+                index: bestIdx,
+                element: meta.data[bestIdx]
+            });
+        });
+        
+        chart.__mouseX = mouseX; 
+        chart.__mouseY = mouseY;
+        return items;
+    };
+
+    const pureCrosshairPlugin = {
+        id: 'pureCrosshair',
+        afterEvent: (chart, args) => {
+            const e = args.event;
+            if (e.type === 'mousemove') {
+                chart.__mouseX = e.x;
+                chart.__mouseY = e.y;
+                chart.__isHovering = true;
+                args.changed = true; 
+            } else if (e.type === 'mouseout' || e.type === 'mouseleave') {
+                chart.__isHovering = false;
+                args.changed = true;
+            }
+        },
+        afterDraw: chart => {
+            if (chart.__isHovering && chart.__mouseX !== undefined && chart.__mouseY !== undefined) {
+                const ctx = chart.ctx;
+                const topY = chart.scales.y.top;
+                const bottomY = chart.scales.y.bottom;
+                const leftX = chart.scales.x.left;
+                const rightX = chart.scales.x.right;
+                const x = chart.__mouseX;
+                const y = chart.__mouseY;
+
+                if (x >= leftX && x <= rightX && y >= topY && y <= bottomY) {
+                    ctx.save();
+                    
+                    ctx.beginPath();
+                    ctx.lineWidth = 1.0; 
+                    ctx.strokeStyle = 'rgba(71, 85, 105, 1)'; 
+                    ctx.setLineDash([4, 4]);
+
+                    ctx.moveTo(x, topY);
+                    ctx.lineTo(x, bottomY);
+                    ctx.moveTo(leftX, y);
+                    ctx.lineTo(rightX, y);
+                    
+                    ctx.stroke();
+
+                    let valX = chart.scales.x.getValueForPixel(x);
+                    let valY = chart.scales.y.getValueForPixel(y);
+                    valY = Math.max(0, Math.min(1.0, valY));
+
+                    const textTime = `Time: ${valX.toFixed(2)}`;
+                    const textSurv = `Surv: ${valY.toFixed(3)}`;
+                    
+                    ctx.font = '13px "Times New Roman", Times, serif';
+                    const textWidth = Math.max(ctx.measureText(textTime).width, ctx.measureText(textSurv).width);
+                    
+                    const padding = 10;
+                    const boxW = textWidth + padding * 2;
+                    const boxH = 46;
+                    
+                    let boxX = x + 15;
+                    let boxY = y + 15;
+                    
+                    if (boxX + boxW > rightX) boxX = x - boxW - 15;
+                    if (boxY + boxH > bottomY) boxY = y - boxH - 15;
+
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)'; 
+                    ctx.beginPath();
+                    ctx.roundRect(boxX, boxY, boxW, boxH, 4);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#f8fafc';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(textTime, boxX + padding, boxY + 8);
+                    ctx.fillText(textSurv, boxX + padding, boxY + 24);
+
+                    ctx.restore();
+                }
+            }
+        }
+    };
+
     const defaultColors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
 
     const canvas = document.getElementById('mainCanvas');
@@ -288,11 +418,24 @@
     let isDrawing = false;
     
     let img = new Image(), mode = 'idle', calibration = [], currentPoints = [], targetRGB = null, targetHSV = null;
-    let currentCleanedData = []; 
-    let mergedDataGrid = []; 
+    let currentCleanedData = [];  
+    let currentVisualData = [];   
+    let currentCensoredPoints = [];     
+    let currentCensoredRealData = [];   
 
     let previewChartInstance = null;
     let mergeChartInstance = null;
+
+    document.getElementById('btn-confirm-yes').addEventListener('click', () => {
+        document.getElementById('custom-confirm-modal').style.display = 'none';
+        mode = 'idle';
+        guide.innerText = `💡 进度 (${savedCurves.length}/${targetCurveCount}): 已清理上一条线。请点击【步骤1】吸取新曲线的颜色。`;
+    });
+
+    document.getElementById('btn-confirm-no').addEventListener('click', () => {
+        document.getElementById('custom-confirm-modal').style.display = 'none';
+        clearCanvasForNextImage();
+    });
 
     function clearTextSelection() {
         if (window.getSelection) window.getSelection().removeAllRanges();
@@ -301,32 +444,62 @@
 
     function updateLockState() {
         let remain = targetCurveCount - savedCurves.length;
+        let total = targetCurveCount || 0;
         
-        if (remain <= 0) {
-            document.getElementById('step1-card').classList.add('step-locked');
-            document.getElementById('extract-card').classList.add('step-locked');
-            document.getElementById('repair-card').classList.add('step-locked');
-            document.getElementById('preview-box').style.display = 'none';
+        let step1Card = document.getElementById('step1-card');
+        let extractCard = document.getElementById('extract-card');
+        let repairCard = document.getElementById('repair-card');
+        let mergeCard = document.getElementById('merge-card');
+        let previewBox = document.getElementById('preview-box');
+
+        if (remain <= 0 && total > 0) {
+            step1Card.style.display = 'none';
+            extractCard.style.display = 'none';
+            repairCard.style.display = 'none';
+            previewBox.style.display = 'none';
+            mergeCard.style.display = 'block';
+            
             document.getElementById('merge-btn').style.animation = "pulse 1.5s infinite";
-            guide.innerText = "🎉 恭喜！所有目标曲线提取完毕，请设定下方合并参数后，点击【一键拼合】！";
+            guide.innerText = "🎉 恭喜！所有目标曲线提取完毕，请设定参数后，点击【一键拼合】！";
         } else {
-            document.getElementById('step1-card').classList.remove('step-locked');
+            mergeCard.style.display = 'none';
+            step1Card.style.display = 'block';
             document.getElementById('merge-btn').style.animation = "none";
             
             if (calibration.length === 3) {
-                document.getElementById('extract-card').classList.remove('step-locked');
-                document.getElementById('repair-card').classList.remove('step-locked');
-                guide.innerText = `✅ 标定成功！👉 请点击左侧【步骤1：吸取目标颜色】`;
-            } else {
-                document.getElementById('extract-card').classList.add('step-locked');
-                document.getElementById('repair-card').classList.add('step-locked');
-                if (img.src && document.getElementById('maxXValue').value) {
-                     // 正在标定
+                const maxXInput = document.getElementById('maxXValue').value;
+                if (maxXInput && !isNaN(maxXInput)) {
+                    extractCard.style.display = 'block';
+                    repairCard.style.display = 'block';
+                    extractCard.classList.remove('step-locked');
+                    repairCard.classList.remove('step-locked');
+                    
+                    guide.innerText = `✅ 准备就绪！👉 请点击左侧【步骤1：吸取目标颜色】`;
                 } else {
-                     guide.innerText = `💡 进度 (${savedCurves.length}/${targetCurveCount}): 请导入图片，输入最大X轴数值后自动开始标定。`;
+                    extractCard.style.display = 'none';
+                    repairCard.style.display = 'none';
+                    extractCard.classList.add('step-locked');
+                    repairCard.classList.add('step-locked');
+                    guide.innerText = "💡 标定完成！请在左侧输入【分析时间的最大值】解锁提取功能。";
+                }
+            } else {
+                extractCard.style.display = 'none';
+                repairCard.style.display = 'none';
+                extractCard.classList.add('step-locked');
+                repairCard.classList.add('step-locked');
+                let idx = savedCurves.length + 1;
+                if (img.src) {
+                     // 正在标定中
+                } else {
+                     guide.innerText = `💡 进度 (${savedCurves.length}/${total}): 请导入第 ${idx} 张图片开始任务。`;
                 }
             }
         }
+    }
+
+    function handleMaxXChange() {
+        if (!img.src) return;
+        updateLockState();
     }
 
     function hardClearCanvas() {
@@ -338,9 +511,20 @@
         wrapper.classList.remove('has-img'); 
         document.getElementById('paste-hint').style.display = 'block';
         calibration = []; currentPoints = []; targetRGB = null; targetHSV = null; mode = 'idle';
+        currentCensoredPoints = []; currentCensoredRealData = []; 
         document.getElementById('hsv-h').innerText = '--'; document.getElementById('hsv-s').innerText = '--'; document.getElementById('hsv-v').innerText = '--';
         hsvSwatch.style.background = 'transparent'; fileInput.value = ""; 
+        
+        document.getElementById('upload-status').innerHTML = "等待导入...";
+        document.getElementById('upload-status').style.color = "#94a3b8";
+        document.getElementById('calib-status').innerHTML = "未开始";
+        document.getElementById('calib-status').style.color = "#94a3b8";
+        document.getElementById('maxX-container').classList.add('step-locked');
         document.getElementById('maxXValue').value = "";
+        
+        document.getElementById('extract-card').style.display = 'none';
+        document.getElementById('repair-card').style.display = 'none';
+        document.getElementById('merge-card').style.display = 'none';
         
         document.getElementById('extract-card').classList.add('step-locked');
         document.getElementById('repair-card').classList.add('step-locked');
@@ -355,13 +539,16 @@
         updateLockState();
     }
 
+    // 🌟 修复 Bug：点击追加曲线后，格式化右侧图表区，隐藏结果面板，从导入图片开始
     function addExtraCurve() {
         if (targetCurveCount === 0) return alert("请先在欢迎界面设定初始任务！");
         targetCurveCount++;
         renderTaskList();
-        hardClearCanvas(); 
+        
+        document.getElementById('result-modal').style.display = 'none';
+        hardClearCanvas();
+        
         updateLockState();
-        alert("✅ 已追加名额");
     }
 
     function deleteCurve(index) {
@@ -381,6 +568,20 @@
         }
     }
 
+    function deletePendingSlot() {
+        targetCurveCount--;
+        renderTaskList();
+        
+        if (document.getElementById('result-modal').style.display === 'flex' && savedCurves.length > 0) {
+            generateMerge();
+        } else if (savedCurves.length === 0 && targetCurveCount === 0) {
+            document.getElementById('result-modal').style.display = 'none';
+        }
+        
+        if(targetCurveCount <= 0) { masterReset(); return; }
+        updateLockState();
+    }
+
     function updateCurveColor(index, newColor) {
         savedCurves[index].color = newColor;
         if (document.getElementById('result-modal').style.display === 'flex') {
@@ -388,7 +589,6 @@
         }
     }
 
-    // 🌟 热更新名字函数 🌟
     function updateCurveName(index, newName) {
         savedCurves[index].name = newName || (`Curve_${index + 1}`);
         if (document.getElementById('result-modal').style.display === 'flex') {
@@ -402,7 +602,6 @@
         if (targetCurveCount === 0) { listDiv.innerHTML = ""; return; }
         for(let i=0; i<targetCurveCount; i++) {
             if (i < savedCurves.length) { 
-                // 🌟 把自定义命名移到了这里 🌟
                 html += `<div class="task-item done">
                             <div style="display:flex; align-items:center; gap:8px; width:100%;">
                                 <input type="color" class="color-picker-input" value="${savedCurves[i].color}" oninput="updateCurveColor(${i}, this.value)" title="点击修改曲线颜色">
@@ -412,7 +611,10 @@
                             <span style="cursor:pointer; color:#ef4444; font-size:1.1rem; margin-left:8px;" onclick="deleteCurve(${i})" title="删除此曲线">🗑️</span>
                          </div>`; 
             } else { 
-                html += `<div class="task-item pending"><span>⏳ 曲线 ${i+1}: 等待提取...</span></div>`; 
+                html += `<div class="task-item pending" style="display:flex; align-items:center; width:100%;">
+                            <span style="flex:1;">⏳ 曲线 ${i+1}: 等待提取...</span>
+                            <span style="cursor:pointer; color:#ef4444; font-size:1.1rem; margin-left:8px;" onclick="deletePendingSlot()" title="删除此空余名额">🗑️</span>
+                         </div>`; 
             }
         }
         listDiv.innerHTML = html;
@@ -421,7 +623,6 @@
     function saveCurrentCurve() {
         if (savedCurves.length >= targetCurveCount) return;
 
-        // 🌟 取消手动输入，直接自动生成编号命名 🌟
         let name = "Curve_" + (savedCurves.length + 1);
         const currentUnit = document.getElementById('xUnit').value;
 
@@ -439,16 +640,20 @@
         savedCurves.push({ 
             name: name, 
             data: currentCleanedData, 
+            visualData: currentVisualData, 
             maxTime: maxExtractedTime, 
             unit: currentUnit,
-            color: assignedColor 
+            color: assignedColor,
+            censored: currentCensoredRealData 
         });
 
         if (savedCurves.length === 1) document.getElementById('globalUnit').value = currentUnit;
 
         renderTaskList(); 
         
-        currentPoints = []; currentCleanedData = []; targetRGB = null; targetHSV = null;
+        currentPoints = []; currentCleanedData = []; currentVisualData = []; targetRGB = null; targetHSV = null;
+        currentCensoredPoints = []; currentCensoredRealData = [];
+        
         hsvSwatch.style.background = 'transparent';
         document.getElementById('hsv-h').innerText = '--'; document.getElementById('hsv-s').innerText = '--'; document.getElementById('hsv-v').innerText = '--';
         document.getElementById('preview-box').style.display = 'none';
@@ -459,25 +664,16 @@
         
         if (remain === 0) {
             updateLockState();
-            setTimeout(() => {
-                alert("🎉 所有曲线已打卡完毕！\n\n您可以在左侧面板重新修改颜色和命名。\n设置无误后，点击【一键拼合】生成报表。");
-            }, 50);
         } else {
             updateLockState();
-            setTimeout(() => {
-                let keepImg = confirm(`✅ 提取成功！还剩 ${remain} 条待提取。\n\n🤔 请问下一条曲线还在【当前图片】上吗？\n\n▶ 点击【确定】：是的，留在当前图片继续提取\n▶ 点击【取消】：不是，我要导入新图`);
-                if(!keepImg) {
-                    clearCanvasForNextImage();
-                } else {
-                    mode = 'idle';
-                    guide.innerText = `💡 进度 (${savedCurves.length}/${targetCurveCount}): 已清理上一条线。请点击【步骤1】吸取新曲线的颜色。`;
-                }
-            }, 50);
+            document.getElementById('custom-confirm-remain').innerText = remain;
+            document.getElementById('custom-confirm-modal').style.display = 'flex';
         }
     }
 
     function clearCurrentLine() {
-        currentPoints = []; targetRGB = null; targetHSV = null;
+        currentPoints = []; targetRGB = null; targetHSV = null; currentCleanedData = []; currentVisualData = [];
+        currentCensoredPoints = []; currentCensoredRealData = [];
         hsvSwatch.style.background = 'transparent';
         document.getElementById('hsv-h').innerText = '--'; document.getElementById('hsv-s').innerText = '--'; document.getElementById('hsv-v').innerText = '--';
         
@@ -493,15 +689,14 @@
 
     function masterReset() {
         if(confirm("⚠️ 警告：此操作将清空你当前所有已提取的曲线，重新回到欢迎界面。确定要重来吗？")) {
-            savedCurves = []; targetCurveCount = 0; mergedDataGrid = [];
+            savedCurves = []; targetCurveCount = 0;
             hardClearCanvas();
             
             document.getElementById('alignMaxX').value = "";
-            document.getElementById('step1-card').classList.remove('step-locked');
             document.getElementById('preview-box').style.display = 'none';
             document.getElementById('result-modal').style.display = 'none'; 
-            renderTaskList(); document.getElementById('merge-btn').style.animation = "none";
-            guide.innerText = "💡 请先在欢迎窗口设定任务目标";
+            renderTaskList(); 
+            updateLockState();
             document.getElementById('welcome-modal').style.display = 'flex';
         }
     }
@@ -517,31 +712,18 @@
             img = tempImg; canvas.width = img.width; canvas.height = img.height;
             wrapper.classList.add('has-img'); document.getElementById('paste-hint').style.display = 'none';
             calibration = []; currentPoints = []; targetRGB = null; targetHSV = null;
+            currentCensoredPoints = []; currentCensoredRealData = [];
             document.getElementById('preview-box').style.display = 'none';
             hsvSwatch.style.background = 'transparent';
             
-            refreshCanvas();
-            updateLockState();
+            document.getElementById('upload-status').innerHTML = "✅ 已导入";
+            document.getElementById('upload-status').style.color = "var(--success)";
+            document.getElementById('maxX-container').classList.add('step-locked');
             
-            const maxXInput = document.getElementById('maxXValue').value;
-            if (!maxXInput || isNaN(maxXInput)) {
-                guide.innerText = "💡 图片已导入。请在左侧输入【X轴最大数值】（输入后自动开启标定）。";
-                mode = 'idle';
-            } else {
-                startCalibration();
-            }
+            refreshCanvas();
+            startCalibration(true); 
         };
         tempImg.src = source;
-    }
-
-    function checkAndAutoStartCalibration() {
-        if (!img.src) return; 
-        if (calibration.length === 0) {
-            const maxXInput = document.getElementById('maxXValue').value;
-            if (maxXInput && !isNaN(maxXInput)) {
-                startCalibration();
-            }
-        }
     }
 
     wrapper.addEventListener('click', () => { if (!img.src && savedCurves.length < targetCurveCount) fileInput.click(); });
@@ -558,12 +740,10 @@
         } 
     });
 
-    function startCalibration() {
+    function startCalibration(isAuto = false) {
         if(!img.src) return alert("请先上传图片！");
-        const maxXInput = document.getElementById('maxXValue').value;
-        if (!maxXInput || isNaN(maxXInput)) return alert("❌ 请先输入左侧【X轴最大数值】后，再开始标定！");
 
-        calibration = []; currentPoints = []; mode = 'calibrate';
+        calibration = []; currentPoints = []; currentCensoredPoints = []; mode = 'calibrate';
         document.getElementById('preview-box').style.display = 'none';
         
         targetRGB = null; targetHSV = null;
@@ -572,12 +752,21 @@
         document.getElementById('hsv-s').innerText = '--';
         document.getElementById('hsv-v').innerText = '--';
 
+        document.getElementById('calib-status').innerHTML = "⏳ 请在右侧图上进行标定";
+        document.getElementById('calib-status').style.color = "var(--warning)";
+        document.getElementById('maxX-container').classList.add('step-locked');
+
         updateLockState();
-        guide.innerText = "🎯 步骤1: 请点击图中的 原点 (0, 0)";
+        
+        if (isAuto) {
+            guide.innerText = "💡 图片已导入，请在图中依次标定原点(0,0)";
+        } else {
+            guide.innerText = "🎯 重新标定: 请在图中依次标定原点(0,0)";
+        }
         refreshCanvas();
     }
 
-    function resetCalibration() { startCalibration(); }
+    function resetCalibration() { startCalibration(false); }
 
     function setMode(m) {
         if (m !== 'calibrate' && calibration.length < 3) return alert("❌ 操作被拦截！\n请先在图上依次点击完成3点标定。");
@@ -587,8 +776,9 @@
             if(!targetRGB) { mode = 'idle'; return alert("❌ 请先执行步骤1：吸取颜色！"); }
             guide.innerText = "✅ 已激活【智能提取】，请将绿色方框对准目标曲线并点击";
         }
-        else if (m === 'manual_add') guide.innerText = "✅ 已激活【补大黄点】，请在曲线上点击修补断点";
-        else if (m === 'eraser') guide.innerText = "✅ 已激活【圆形橡皮】，请在图上按住鼠标擦除多余噪点";
+        else if (m === 'manual_add') guide.innerText = "✅ 已激活【补断点】，请在曲线上点击修补断点";
+        else if (m === 'eraser') guide.innerText = "✅ 已激活【橡皮擦】，请在图上按住鼠标擦除多余噪点";
+        else if (m === 'censor') guide.innerText = "✅ 已激活【标记删失点】，请用垂直青线对准原图中的删失点并点击！";
     }
 
     function getMousePos(e) { const rect = canvas.getBoundingClientRect(); return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) }; }
@@ -596,15 +786,16 @@
     canvas.onmouseleave = () => { 
         eraserCursor.style.display = 'none'; 
         zoomContainer.style.display = 'none'; 
-        if (mode === 'calibrate') refreshCanvas();
+        if (mode === 'calibrate' || mode === 'censor') refreshCanvas();
     };
 
     function calculateRealValue(pos) {
-        const maxXVal = parseFloat(document.getElementById('maxXValue').value);
+        const maxXInput = document.getElementById('maxXValue').value;
+        const maxXVal = parseFloat(maxXInput) || 0;
         const origin = calibration[0], xRef = calibration[1], yRef = calibration[2];
         let tx = ((pos.x - origin.x) / (xRef.x - origin.x)) * maxXVal;
         let ty = 1 - ((pos.y - yRef.y) / (origin.y - yRef.y));
-        return { time: tx.toFixed(2), rate: Math.max(0, ty).toFixed(4) };
+        return { time: maxXInput ? tx.toFixed(2) : "---", rate: Math.max(0, ty).toFixed(3) };
     }
 
     canvas.onmousemove = (e) => {
@@ -623,21 +814,27 @@
             document.getElementById('disp-x').innerText = "---"; document.getElementById('disp-y').innerText = "---";
         }
 
-        if (mode === 'calibrate') {
+        if (mode === 'calibrate' || mode === 'censor') {
             refreshCanvas(); 
             ctx.save();
             ctx.beginPath();
             ctx.setLineDash([4, 4]);
             
-            let cColor = 'rgba(239, 68, 68, 0.8)'; 
-            if (calibration.length === 1) cColor = 'rgba(34, 197, 94, 0.8)'; 
-            if (calibration.length === 2) cColor = 'rgba(6, 182, 212, 0.8)'; 
+            let cColor = '#0ea5e9'; 
+            if (mode === 'calibrate') {
+                cColor = 'rgba(59, 130, 246, 0.8)'; 
+                if (calibration.length === 0) cColor = 'rgba(239, 68, 68, 0.8)'; 
+                if (calibration.length === 1) cColor = 'rgba(34, 197, 94, 0.8)'; 
+                if (calibration.length === 2) cColor = 'rgba(6, 182, 212, 0.8)'; 
+            }
             
             ctx.strokeStyle = cColor;
             ctx.lineWidth = 1;
             
-            ctx.moveTo(0, pos.y);
-            ctx.lineTo(canvas.width, pos.y);
+            if (mode === 'calibrate') {
+                ctx.moveTo(0, pos.y);
+                ctx.lineTo(canvas.width, pos.y);
+            }
             ctx.moveTo(pos.x, 0);
             ctx.lineTo(pos.x, canvas.height);
             
@@ -649,31 +846,21 @@
             const rect = canvas.getBoundingClientRect(), ds = rect.width / canvas.width;
             eraserCursor.style.display = 'block';
             
-            if (mode === 'picker') {
-                const sr = 4; 
+            if (mode === 'picker' || mode === 'smart') {
+                const sr = 10; 
                 const boxSize = (sr * 2 + 1) * ds;
                 eraserCursor.style.width = boxSize + 'px';
                 eraserCursor.style.height = boxSize + 'px';
-                eraserCursor.style.left = (e.clientX - boxSize / 2) + 'px';
-                eraserCursor.style.top = (e.clientY - boxSize / 2) + 'px';
-                eraserCursor.style.borderColor = '#0ea5e9'; 
-                eraserCursor.style.borderRadius = '0%';      
-                eraserCursor.style.borderWidth = '2px';
-            } else if (mode === 'smart') {
-                const sr = 6; 
-                const boxSize = (sr * 2 + 1) * ds;
-                eraserCursor.style.width = boxSize + 'px';
-                eraserCursor.style.height = boxSize + 'px';
-                eraserCursor.style.left = (e.clientX - boxSize / 2) + 'px';
-                eraserCursor.style.top = (e.clientY - boxSize / 2) + 'px';
+                eraserCursor.style.left = e.clientX + 'px'; 
+                eraserCursor.style.top = e.clientY + 'px';
                 eraserCursor.style.borderColor = '#22c55e'; 
                 eraserCursor.style.borderRadius = '0%';      
                 eraserCursor.style.borderWidth = '2px';
             } else {
                 const r = parseInt(document.getElementById('brushSize').value);
                 eraserCursor.style.width = eraserCursor.style.height = (r * 2 * ds) + 'px';
-                eraserCursor.style.left = (e.clientX - r * ds) + 'px';
-                eraserCursor.style.top = (e.clientY - r * ds) + 'px';
+                eraserCursor.style.left = e.clientX + 'px'; 
+                eraserCursor.style.top = e.clientY + 'px';
                 eraserCursor.style.borderColor = mode === 'eraser' ? 'red' : '#facc15';
                 eraserCursor.style.borderRadius = mode === 'manual_add' ? '0%' : '50%';
                 eraserCursor.style.borderWidth = '2px';
@@ -685,6 +872,7 @@
         if (isDrawing && mode === 'eraser') {
             const r = parseInt(document.getElementById('brushSize').value);
             currentPoints = currentPoints.filter(p => Math.hypot(p.x - pos.x, p.y - pos.y) > r);
+            currentCensoredPoints = currentCensoredPoints.filter(p => Math.hypot(p.x - pos.x, p.y - pos.y) > r);
             refreshCanvas(); renderPreview();
         }
     };
@@ -692,12 +880,18 @@
     window.addEventListener('mouseup', () => isDrawing = false);
 
     function handleCalibration(pos) {
-        if (calibration.length === 0) { calibration.push(pos); guide.innerText = "🎯 步骤2: 点击 X 轴最大点"; }
-        else if (calibration.length === 1) { calibration.push(pos); guide.innerText = "🎯 步骤3: 点击 Y 轴最高点 (1.0)"; }
+        if (calibration.length === 0) { calibration.push(pos); guide.innerText = "🎯 标定X轴分析时间的最大值"; }
+        else if (calibration.length === 1) { calibration.push(pos); guide.innerText = "🎯 标定Y轴最高点(1.0)"; }
         else if (calibration.length === 2) { 
             calibration.push(pos); 
             mode = 'idle'; 
+            
+            document.getElementById('calib-status').innerHTML = "✅ 已标定";
+            document.getElementById('calib-status').style.color = "var(--success)";
+            document.getElementById('maxX-container').classList.remove('step-locked');
+            
             updateLockState(); 
+            document.getElementById('maxXValue').focus();
         }
         refreshCanvas();
     }
@@ -710,7 +904,7 @@
         else if (mode === 'picker') {
             const px = Math.round(pos.x), py = Math.round(pos.y);
             
-            const searchRadius = 4; 
+            const searchRadius = 10; 
             const imgData = ctx.getImageData(px - searchRadius, py - searchRadius, searchRadius * 2 + 1, searchRadius * 2 + 1).data;
             
             let maxColorDist = -1;
@@ -737,7 +931,7 @@
         }
         else if (mode === 'smart') { 
             const px = Math.round(pos.x), py = Math.round(pos.y);
-            const searchRadius = 6; 
+            const searchRadius = 10; 
             const imgData = ctx.getImageData(px - searchRadius, py - searchRadius, searchRadius * 2 + 1, searchRadius * 2 + 1).data;
             
             const tol = parseInt(document.getElementById('tolerance').value);
@@ -785,10 +979,17 @@
             smartExtract(bestX, bestY); 
         }
         else if (mode === 'manual_add') { currentPoints.push({ x: pos.x, y: pos.y, isManual: true }); refreshCanvas(); renderPreview(); }
+        else if (mode === 'censor') {
+            if(currentPoints.length < 5) return alert("❌ 请先提取主曲线，再标记删失点！");
+            currentCensoredPoints.push({ x: pos.x, y: pos.y }); 
+            refreshCanvas(); 
+            renderPreview(); 
+        }
         else if (mode === 'eraser') {
             isDrawing = true;
             const r = parseInt(document.getElementById('brushSize').value);
             currentPoints = currentPoints.filter(p => Math.hypot(p.x - pos.x, p.y - pos.y) > r);
+            currentCensoredPoints = currentCensoredPoints.filter(p => Math.hypot(p.x - pos.x, p.y - pos.y) > r);
             refreshCanvas(); renderPreview();
         }
     };
@@ -804,6 +1005,13 @@
             else { ctx.fillStyle = 'rgba(239, 68, 68, 0.7)'; ctx.fillRect(p.x, p.y, 1, 1); }
         });
         
+        currentCensoredPoints.forEach(p => {
+            ctx.strokeStyle = '#0ea5e9';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(p.x - 5, p.y); ctx.lineTo(p.x + 5, p.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(p.x, p.y - 5); ctx.lineTo(p.x, p.y + 5); ctx.stroke();
+        });
+
         calibration.forEach((p, i) => drawMarker(p.x, p.y, ['red', '#0f0', '#0ef'][i]));
     }
 
@@ -885,7 +1093,7 @@
             return;
         }
         
-        guide.innerText = "✅ 提取完成！可继续点击其他断点处补充，或进行修补";
+        guide.innerText = "✅ 提取完成！可继续点击其他断点处补充，或进行修补。";
         renderPreview();
     }
 
@@ -897,37 +1105,135 @@
         let origin = calibration[0], xRef = calibration[1], yRef = calibration[2];
         
         let rawData = [];
-        
-        rawData.push({ x: 0, y: 1.0 });
-
         currentPoints.forEach(p => {
             let tx = ((p.x - origin.x) / (xRef.x - origin.x)) * maxXVal;
             let ty = 1 - ((p.y - yRef.y) / (origin.y - yRef.y));
-            if (tx < 0 && tx > -maxXVal * 0.05) tx = 0;
-            if(tx >= 0) rawData.push({ x: tx, y: ty });
+            
+            ty = Math.min(1.0, ty);
+
+            if (tx >= -maxXVal * 0.05) { 
+                rawData.push({ x: Math.max(0, tx), y: ty }); 
+            }
         });
 
-        rawData.sort((a,b) => a.x - b.x);
-        
-        currentCleanedData = [];
-        let currY = 1.0;
-        for(let i=0; i<rawData.length; i++) {
-            currY = Math.min(currY, Math.max(0, rawData[i].y));
-            currentCleanedData.push({ x: rawData[i].x, y: currY });
+        rawData.sort((a,b) => {
+            if (Math.abs(a.x - b.x) > 1e-6) return a.x - b.x;
+            return b.y - a.y; 
+        });
+
+        currentVisualData = [];
+        let seen = new Set();
+        let dxTol = maxXVal / canvas.width;
+        let dyTol = 1.0 / canvas.height;
+
+        let addVisualPoint = (pt) => {
+            let key = pt.x.toFixed(3) + ',' + pt.y.toFixed(3); 
+            if (!seen.has(key)) {
+                seen.add(key);
+                currentVisualData.push(pt);
+            }
+        };
+
+        if (rawData.length > 0 && rawData[0].x > dxTol) {
+            let firstPt = rawData[0];
+            let visualStepX = dxTol * 2.0; 
+            let visualStepY = dyTol * 2.0; 
+            
+            for (let fillX = 0; fillX < firstPt.x; fillX += visualStepX) {
+                addVisualPoint({ x: fillX, y: 1.0 });
+            }
+            if (firstPt.y < 1.0) {
+                for (let fillY = 1.0; fillY >= firstPt.y; fillY -= visualStepY) {
+                    addVisualPoint({ x: firstPt.x, y: fillY });
+                }
+            }
         }
+
+        rawData.forEach(pt => {
+            addVisualPoint(pt);
+        });
+
+        currentCleanedData = [{ x: 0, y: 1.0 }];
+        let currY = 1.0; 
+        rawData.forEach(pt => {
+            if (pt.y < currY) currY = pt.y; 
+            currentCleanedData.push({ x: pt.x, y: currY });
+        });
+
+        let optimizedData = [];
+        for (let i = 0; i < currentCleanedData.length; i++) {
+            if (i === 0) optimizedData.push(currentCleanedData[i]);
+            else {
+                let last = optimizedData[optimizedData.length - 1];
+                let curr = currentCleanedData[i];
+                if (Math.abs(last.x - curr.x) > 1e-5 || Math.abs(last.y - curr.y) > 1e-5) {
+                    optimizedData.push(curr);
+                }
+            }
+        }
+        currentCleanedData = optimizedData;
+
+        currentCensoredRealData = [];
+        currentCensoredPoints.forEach(p => {
+            let tx = ((p.x - origin.x) / (xRef.x - origin.x)) * maxXVal;
+            if (tx >= 0) {
+                let ty = 1.0;
+                let ptsBefore = currentCleanedData.filter(d => d.x <= tx + 1e-6);
+                if(ptsBefore.length > 0) ty = ptsBefore[ptsBefore.length - 1].y;
+                let isDup = currentCensoredRealData.some(exist => Math.abs(exist.x - tx) < (maxXVal * 0.01));
+                if (!isDup) {
+                    currentCensoredRealData.push({ x: tx, y: ty });
+                }
+            }
+        });
 
         const ctxChart = document.getElementById('previewChart').getContext('2d');
         if(previewChartInstance) previewChartInstance.destroy();
         
+        let previewDatasets = [
+            { 
+                type: 'line',
+                data: currentVisualData, 
+                backgroundColor: '#ef4444', 
+                borderColor: 'transparent', 
+                showLine: false,        
+                pointRadius: 1.0,       
+                borderWidth: 0,
+                pointStyle: 'rect',     
+                pointHoverRadius: 4,
+                clip: false             
+            }
+        ];
+
+        if (currentCensoredRealData.length > 0) {
+            previewDatasets.push({
+                type: 'scatter',
+                data: currentCensoredRealData,
+                backgroundColor: '#ef4444',
+                borderColor: '#ef4444',
+                pointStyle: 'cross',
+                pointRadius: 6,
+                borderWidth: 2,
+                clip: false
+            });
+        }
+        
         previewChartInstance = new Chart(ctxChart, {
-            type: 'line',
-            data: { datasets: [{ data: currentCleanedData, borderColor: '#ef4444', stepped: true, fill: false, borderWidth: 2, pointRadius: 0, pointHoverRadius: 4 }] },
+            data: { datasets: previewDatasets },
             options: {
+                animation: false, 
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { display: false }, tooltip: { enabled: false } },
                 scales: { 
                     x: { type: 'linear', min: 0, max: maxXVal, ticks: { font: {size: 9, family: '"Times New Roman", Times, serif'} } }, 
-                    y: { min: 0, max: 1.0, ticks: { font: {size: 9, family: '"Times New Roman", Times, serif'} } } 
+                    y: { 
+                        min: 0, 
+                        max: 1.05, 
+                        ticks: { 
+                            font: {size: 9, family: '"Times New Roman", Times, serif'},
+                            callback: function(value) { return value > 1.0 ? '' : value; } 
+                        } 
+                    } 
                 },
                 layout: { padding: { top: 5 } } 
             }
@@ -948,57 +1254,56 @@
         if(!alignMaxXVal) return alert("❌ 请输入【新图片X轴的最大值】！");
         
         let maxT = parseFloat(alignMaxXVal);
-        let step = parseFloat(document.getElementById('mergeStep').value); 
         let xTickStepVal = parseFloat(document.getElementById('xTickStep').value); 
         
         let globalUnit = document.getElementById('globalUnit').value;
-        let globalFactor = getFactorToMonths(globalUnit);
         
         let yLabelText = document.getElementById('yAxisLabel').value || 'Survival Rate';
 
-        mergedDataGrid = []; 
-        
-        let chartDatasets = savedCurves.map((curve) => {
+        let chartDatasets = [];
+
+        savedCurves.forEach((curve) => {
             let cFactor = getFactorToMonths(curve.unit);
-            let mappedData = curve.data.map(p => ({
+            
+            let mappedVisualData = curve.visualData.map(p => ({
                 x: p.x * (getFactorToMonths(globalUnit) / cFactor),
                 y: p.y
             }));
             
-            return {
+            chartDatasets.push({
+                type: 'line',
                 label: curve.name, 
-                data: mappedData, 
-                borderColor: curve.color, 
+                data: mappedVisualData, 
                 backgroundColor: curve.color, 
-                stepped: true, 
-                fill: false, 
-                borderWidth: 2, 
-                pointRadius: 0,
+                borderColor: 'transparent', 
+                showLine: false,     
+                pointRadius: 1.0,    
+                borderWidth: 0,      
+                pointStyle: 'rect',
                 pointHoverRadius: 4,
-                pointStyle: 'line' 
-            };
-        });
-
-        for (let t = 0; t <= maxT; t += step) {
-            let timeStr = t.toFixed(2);
-            let rowDict = { time: timeStr };
-            let global_t_in_months = t * globalFactor;
-
-            savedCurves.forEach((curve) => {
-                let cFactor = getFactorToMonths(curve.unit);
-                let local_t = global_t_in_months / cFactor;
-
-                if (local_t > curve.maxTime + 1e-6) {
-                    rowDict[curve.name] = ""; 
-                } else {
-                    let rate = 1.0; 
-                    let pointsBefore = curve.data.filter(p => p.x <= local_t + 1e-6);
-                    if (pointsBefore.length > 0) rate = pointsBefore[pointsBefore.length - 1].y;
-                    rowDict[curve.name] = rate.toFixed(4);
-                }
+                clip: false          
             });
-            mergedDataGrid.push(rowDict);
-        }
+
+            if (curve.censored && curve.censored.length > 0) {
+                let mappedCensored = curve.censored.map(p => ({
+                    x: p.x * (getFactorToMonths(globalUnit) / cFactor),
+                    y: p.y
+                })).filter(p => p.x <= maxT);
+
+                chartDatasets.push({
+                    type: 'scatter',
+                    label: curve.name + ' (Censored)',
+                    data: mappedCensored,
+                    borderColor: curve.color,
+                    backgroundColor: curve.color,
+                    pointStyle: 'cross',
+                    pointRadius: 6,
+                    borderWidth: 2,
+                    showLine: false,
+                    clip: false
+                });
+            }
+        });
 
         document.getElementById('result-modal').style.display = 'flex';
         document.getElementById('merge-btn').style.animation = "none";
@@ -1009,35 +1314,66 @@
         let unitLabel = globalUnit === 'M' ? 'Months' : (globalUnit === 'Y' ? 'Years' : (globalUnit === 'W' ? 'Weeks' : 'Days'));
 
         mergeChartInstance = new Chart(ctxChart, {
-            type: 'line', 
             data: { datasets: chartDatasets },
             options: {
+                animation: false, 
                 responsive: true, maintainAspectRatio: false,
                 color: '#1e293b', 
+                hover: { mode: null }, 
                 plugins: { 
-                    legend: { labels: { usePointStyle: true, boxWidth: 25, color: '#1e293b', font: { size: 14, family: '"Times New Roman", Times, serif' } } } 
+                    tooltip: { enabled: false }, 
+                    legend: { 
+                        labels: { 
+                            usePointStyle: true, boxWidth: 25, color: '#000000', font: { size: 14, family: '"Times New Roman", Times, serif' },
+                            filter: function(item) { return !item.text.includes('(Censored)'); },
+                            generateLabels: function(chart) {
+                                const datasets = chart.data.datasets;
+                                return datasets.map((dataset, i) => {
+                                    if (dataset.label.includes('(Censored)')) return null;
+                                    return {
+                                        text: dataset.label,
+                                        fillStyle: dataset.backgroundColor,
+                                        hidden: !chart.isDatasetVisible(i),
+                                        lineCap: dataset.borderCapStyle,
+                                        lineDash: dataset.borderDash,
+                                        lineDashOffset: dataset.borderDashOffset,
+                                        lineJoin: dataset.borderJoinStyle,
+                                        strokeStyle: dataset.backgroundColor,
+                                        pointStyle: 'rect',
+                                        datasetIndex: i,
+                                        fontColor: '#000000'
+                                    };
+                                }).filter(item => item !== null);
+                            }
+                        } 
+                    }
                 },
                 scales: { 
                     x: { 
                         type: 'linear', min: 0, max: maxT, 
-                        title: { display: true, text: `Time (${unitLabel})`, color: '#1e293b', font: {size: 14, family: '"Times New Roman", Times, serif'} }, 
+                        title: { display: true, text: `Time (${unitLabel})`, color: '#1e293b', font: {size: 16, family: '"Times New Roman", Times, serif'} }, 
                         ticks: { 
                             stepSize: isNaN(xTickStepVal) || xTickStepVal <= 0 ? undefined : xTickStepVal,
                             color: '#1e293b', 
-                            font: {size: 11, family: '"Times New Roman", Times, serif'} 
+                            font: {size: 13, family: '"Times New Roman", Times, serif'} 
                         },
                         grid: { color: '#e2e8f0', borderColor: '#cbd5e1' } 
                     }, 
                     y: { 
-                        min: 0, max: 1.0, 
-                        title: { display: true, text: yLabelText, color: '#1e293b', font: {size: 14, family: '"Times New Roman", Times, serif'} }, 
-                        ticks: { color: '#1e293b', font: {size: 11, family: '"Times New Roman", Times, serif'} },
+                        min: 0, 
+                        max: 1.05, 
+                        title: { display: true, text: yLabelText, color: '#1e293b', font: {size: 16, family: '"Times New Roman", Times, serif'} }, 
+                        ticks: { 
+                            color: '#1e293b', 
+                            font: {size: 13, family: '"Times New Roman", Times, serif'},
+                            callback: function(value) { return value > 1.0 ? '' : value; }
+                        },
                         grid: { color: '#e2e8f0', borderColor: '#cbd5e1' } 
                     } 
                 },
-                layout: { padding: { top: 10 } },
-                interaction: { intersect: false, mode: 'index' }
-            }
+                layout: { padding: { top: 10 } }
+            },
+            plugins: [pureCrosshairPlugin]
         });
     }
 
@@ -1055,28 +1391,6 @@
         const link = document.createElement('a');
         const d = new Date(); const ds = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
         link.download = `KM_Merged_Plot_${ds}.png`; link.href = exportCanvas.toDataURL('image/png', 1.0); link.click();
-    }
-
-    function exportMergedCSV() {
-        clearTextSelection(); 
-        if(mergedDataGrid.length === 0) return;
-        
-        let globalUnit = document.getElementById('globalUnit').value;
-        let fullUnit = globalUnit === 'M' ? 'Months' : (globalUnit === 'Y' ? 'Years' : (globalUnit === 'W' ? 'Weeks' : 'Days'));
-        
-        let curveNames = savedCurves.map(c => c.name);
-        let header = `Unified_Time(${fullUnit}),` + curveNames.join(",") + "\n";
-        
-        let csvBody = mergedDataGrid.map(row => {
-            let line = [row.time];
-            curveNames.forEach(name => line.push(row[name] === "" ? "" : row[name]));
-            return line.join(",");
-        }).join("\n");
-        
-        const link = document.createElement("a");
-        link.setAttribute("href", encodeURI("data:text/csv;charset=utf-8,\uFEFF" + header + csvBody)); 
-        const d = new Date(); const ds = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-        link.setAttribute("download", `KM_Merged_Result_${ds}.csv`); link.click();
     }
 </script>
 </body>
