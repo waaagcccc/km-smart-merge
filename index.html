@@ -426,6 +426,14 @@
     let previewChartInstance = null;
     let mergeChartInstance = null;
 
+    // 🌟 处理自定义复选框切换
+    function toggleCurveSelection(index, isChecked) {
+        savedCurves[index].isSelected = isChecked;
+        if (document.getElementById('result-modal').style.display === 'flex') {
+            generateMerge();
+        }
+    }
+
     document.getElementById('btn-confirm-yes').addEventListener('click', () => {
         document.getElementById('custom-confirm-modal').style.display = 'none';
         mode = 'idle';
@@ -539,7 +547,6 @@
         updateLockState();
     }
 
-    // 🌟 修复 Bug：点击追加曲线后，格式化右侧图表区，隐藏结果面板，从导入图片开始
     function addExtraCurve() {
         if (targetCurveCount === 0) return alert("请先在欢迎界面设定初始任务！");
         targetCurveCount++;
@@ -602,8 +609,11 @@
         if (targetCurveCount === 0) { listDiv.innerHTML = ""; return; }
         for(let i=0; i<targetCurveCount; i++) {
             if (i < savedCurves.length) { 
+                // 🌟 NEW: 加入复选框，根据 isSelected 状态渲染
+                let checkedAttr = savedCurves[i].isSelected !== false ? 'checked' : ''; 
                 html += `<div class="task-item done">
                             <div style="display:flex; align-items:center; gap:8px; width:100%;">
+                                <input type="checkbox" ${checkedAttr} onchange="toggleCurveSelection(${i}, this.checked)" title="勾选参与合并" style="width:16px; height:16px; margin:0; cursor:pointer;">
                                 <input type="color" class="color-picker-input" value="${savedCurves[i].color}" oninput="updateCurveColor(${i}, this.value)" title="点击修改曲线颜色">
                                 <span style="white-space:nowrap; color:#22c55e;">✅ 曲线 ${i+1}:</span>
                                 <input type="text" value="${savedCurves[i].name}" oninput="updateCurveName(${i}, this.value)" style="flex:1; padding:4px; margin:0; border:1px solid #475569; border-radius:4px; background:#0f172a; color:#f1f5f9; font-size:0.75rem;" placeholder="命名曲线" title="点击自定义曲线名称">
@@ -644,7 +654,8 @@
             maxTime: maxExtractedTime, 
             unit: currentUnit,
             color: assignedColor,
-            censored: currentCensoredRealData 
+            censored: currentCensoredRealData,
+            isSelected: true // 🌟 NEW: 默认勾选参与合并
         });
 
         if (savedCurves.length === 1) document.getElementById('globalUnit').value = currentUnit;
@@ -1109,6 +1120,7 @@
             let tx = ((p.x - origin.x) / (xRef.x - origin.x)) * maxXVal;
             let ty = 1 - ((p.y - yRef.y) / (origin.y - yRef.y));
             
+            // 🚀 恢复：强制限位，绝不允许任何像素超过 1.0 (100%)，防止顶部噪点乱飞！
             ty = Math.min(1.0, ty);
 
             if (tx >= -maxXVal * 0.05) { 
@@ -1248,7 +1260,9 @@
     }
 
     function generateMerge() {
-        if(savedCurves.length < 1) return alert("❌ 任务清单为空！请先提取并打卡保存曲线。");
+        // 🌟 NEW: 提取所有被勾选的曲线参与合并
+        let activeCurves = savedCurves.filter(c => c.isSelected !== false);
+        if(activeCurves.length < 1) return alert("❌ 没有选中任何曲线参与合并！请在左侧列表勾选至少一条曲线。");
         
         let alignMaxXVal = document.getElementById('alignMaxX').value;
         if(!alignMaxXVal) return alert("❌ 请输入【新图片X轴的最大值】！");
@@ -1262,7 +1276,7 @@
 
         let chartDatasets = [];
 
-        savedCurves.forEach((curve) => {
+        activeCurves.forEach((curve) => {
             let cFactor = getFactorToMonths(curve.unit);
             
             let mappedVisualData = curve.visualData.map(p => ({
